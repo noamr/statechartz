@@ -1,0 +1,110 @@
+<html>
+	<head>
+		<title>Calculator with statecharts</title>
+		<script src="statechart.js"></script>
+		<script>
+			var longExpression = "";
+			var shortExpression = 0;
+			var result = 0;
+
+			function update(e) { shortExpression = e; updateDisplay(); }
+			function reset() { update(''); }
+			function concat(e) { update(shortExpression + e.data); }
+			function subcalc() {
+				longExpression += shortExpression.length ? '(' + shortExpression + ')' : '';
+				result = eval(longExpression);
+				shortExpression = '';
+				updateDisplay();
+			}
+			function calc() {
+				subcalc();
+				update(result);
+				longExpression = '';
+				result = 0;
+			}
+			function subcalcAndConcat(e) { subcalc(); longExpression += e.data; }
+			function updateDisplay() { console.log(shortExpression === '' ? result : shortExpression); }
+			(function() {
+				var w = window;
+				with (window.Statechart) {
+					w.calculatorStatechart = new Statechart(
+						State(
+							Export("digit", "dot", "oper", "c", "equals"),
+							State("calcLogic",
+								State("on",
+									Entry(updateDisplay),
+									State("ready",
+										State("begin", Entry(updateDisplay),
+											Transition(Event("oper"), DataEquals('-'), Target("negated1"))
+										),
+										State("result"),
+										Transition(Event("oper"), Target("opEntered")),
+										Transition(Event("digit"), DataEquals('0'), Target("zero1"), reset),
+										Transition(Event("digit"), Target("int1"), reset),
+										Transition(Event("dot"), Target("frac1"), reset)
+									),
+									State("negated1", Entry(function() { update('-'); }),
+										Transition(Event("digit"), DataEquals('0'), Target("zero1")),
+										Transition(Event("digit"), Target("int1")),
+										Transition(Event("dot"), Target("frac1"))
+									),
+									State("operand1",
+										State("zero1",
+											Transition(Event("digit"), DataNotEquals('0'), Target("int1")),
+											Transition(Event("dot"), Target("frac1"))
+										),
+										State("int1",
+											Transition(Event("dot"), Target("frac1")),
+											Transition(Event("digit"), concat),
+											Entry(function(e) { update(shortExpression + e.data);  })
+										),
+										State("frac1",
+											Entry(function(e) { update(shortExpression + '.');  }),
+											Transition(Event("digit"), concat)
+										),
+										Transition(Event("oper"), Target("opEntered"))
+									),
+									State("opEntered",
+										Entry(subcalcAndConcat),
+										Transition(Event("oper"), DataEquals('-'), Target("negated2")),
+										Transition(Event("dot"), Target("frac2")),
+										Transition(Event("digit"), DataEquals('0'), Target("zero2")),
+										Transition(Event("digit"), Target("int2"))
+									),
+									State("negated2",
+										Entry(function() { update('-'); }),
+										Transition(Event("digit"), DataEquals('0'), Target("zero2")),
+										Transition(Event("digit"), Target("int2")),
+										Transition(Event("dot"), Target("frac2"))
+									),
+									State("operand2",
+										State("zero2",
+											Transition(Event("digit"), DataNotEquals('0'), Target("int2")),
+											Transition(Event("dot"), Target("frac2"))
+										),
+										State("int2",
+											Entry(function(e) { update(shortExpression + e.data); }),
+											Transition(Event("digit"), concat),
+											Transition(Event("dot"), Target("frac2"))
+										),
+										State("frac2",
+											Entry(function() { update(shortExpression + '.'); }),
+											Transition(Event("digit"), concat)
+										),
+										Transition(Event("oper"), Target("opEntered"), subcalcAndConcat),
+										Transition(Event("equals"), Target("result"), calc),
+										Transition(Event("c"), Target("on"), function() { longExpression = 0; shortExpression = ''; result = 0; })
+									)
+								)
+							)
+						), Export("digit", "dot", "")
+					);
+				}
+			}
+
+		)();
+		</script>
+    </head>
+	<body>
+	</body>
+</html>
